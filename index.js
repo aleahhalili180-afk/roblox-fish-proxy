@@ -2,20 +2,19 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 
+app.use(express.json());
+
 const FISH_AUDIO_API_KEY = "6c3315a3448c4d6ca782ccfa7a404991";
 
-// Changed route to look like a direct file path ending in .mp3
-app.get('/tts/:voice_id/:text.mp3', async (req, res) => {
-    const { voice_id, text } = req.params;
+// We switch to a POST request that sends back the audio data as a base64 string
+app.post('/get-tts', async (req, res) => {
+    const { text, voice_id } = req.body;
 
     if (!text || !voice_id) {
-        return res.status(400).send("Missing text or voice_id parameters");
+        return res.status(400).json({ error: "Missing text or voice_id" });
     }
 
     try {
-        // Decode the text since it arrives URL-encoded from Roblox
-        const decodedText = decodeURIComponent(text);
-
         const response = await axios({
             method: 'post',
             url: 'https://api.fish.audio/v1/tts',
@@ -24,19 +23,20 @@ app.get('/tts/:voice_id/:text.mp3', async (req, res) => {
                 'Content-Type': 'application/json'
             },
             data: {
-                text: decodedText,
+                text: text,
                 voice_id: voice_id,
                 format: 'mp3'
             },
-            responseType: 'stream'
+            responseType: 'arraybuffer' // Get raw binary data
         });
 
-        res.setHeader('Content-Type', 'audio/mpeg');
-        response.data.pipe(res);
+        // Convert the audio binary into a base64 string Roblox can read
+        const base64Audio = Buffer.from(response.data, 'binary').toString('base64');
+        res.json({ audioData: base64Audio });
 
     } catch (error) {
         console.error(error);
-        res.status(500).send("Error generating TTS");
+        res.status(500).json({ error: "Failed to generate TTS" });
     }
 });
 
