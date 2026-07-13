@@ -4,14 +4,18 @@ const app = express();
 
 const FISH_AUDIO_API_KEY = "6c3315a3448c4d6ca782ccfa7a404991";
 
-app.get('/tts', async (req, res) => {
-    const { text, voice_id } = req.query;
+// Changed route to look like a direct file path ending in .mp3
+app.get('/tts/:voice_id/:text.mp3', async (req, res) => {
+    const { voice_id, text } = req.params;
 
     if (!text || !voice_id) {
         return res.status(400).send("Missing text or voice_id parameters");
     }
 
     try {
+        // Decode the text since it arrives URL-encoded from Roblox
+        const decodedText = decodeURIComponent(text);
+
         const response = await axios({
             method: 'post',
             url: 'https://api.fish.audio/v1/tts',
@@ -20,7 +24,7 @@ app.get('/tts', async (req, res) => {
                 'Content-Type': 'application/json'
             },
             data: {
-                text: text,
+                text: decodedText,
                 voice_id: voice_id,
                 format: 'mp3'
             },
