@@ -10,7 +10,7 @@ app.post('/get-audio-bytes', async (req, res) => {
     const { text, voice_id } = req.body;
 
     if (!text || !voice_id) {
-        return res.status(400).json({ error: "Missing text or voice_id" });
+        return res.status(400).json({ success: false, error: "Missing text or voice_id" });
     }
 
     try {
@@ -19,33 +19,31 @@ app.post('/get-audio-bytes', async (req, res) => {
             url: 'https://api.fish.audio/v1/tts',
             headers: {
                 'Authorization': `Bearer ${FISH_AUDIO_API_KEY}`,
-                'Content-Type': 'application/json',
-                // Using the state-of-the-art developer tier engine
-                'model': 's2.1-pro-free' 
+                'Content-Type': 'application/json'
             },
             data: {
                 text: text,
-                reference_id: voice_id, // Map it to Fish Audio's exact parameter requirement
-                format: 'pcm',          // Requesting raw waveforms
-                sample_rate: 16000
+                reference_id: voice_id,
+                format: 'pcm',
+                sample_rate: 16000,
+                latency: 'normal'
             },
             responseType: 'arraybuffer'
         });
 
-        // Pack the audio binary stream into a small network transmission string
         const base64String = Buffer.from(response.data).toString('base64');
-        res.json({ success: true, audioData: base64String });
+        return res.json({ success: true, audioData: base64String });
 
     } catch (error) {
-        // Log the exact internal failure explanation to your Render Dashboard
+        console.error("Proxy error context:");
         if (error.response) {
-            console.error("Fish Audio Error Status:", error.response.status);
-            console.error("Fish Audio Error Body:", error.response.data.toString());
+            console.error(error.response.status, error.response.data.toString());
         } else {
-            console.error("Proxy System Error:", error.message);
+            console.error(error.message);
         }
-        res.status(500).json({ error: "Failed to fetch audio from backend service" });
+        // Always return valid JSON back to Roblox so it doesn't crash on decode
+        return res.status(500).json({ success: false, error: "Backend failure" });
     }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Proxy operational!'));
+app.listen(process.env.PORT || 3000, () => console.log('Proxy online!'));
