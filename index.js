@@ -24,25 +24,19 @@ app.post('/get-audio-pcm', async (req, res) => {
             data: {
                 text: text,
                 voice_id: voice_id,
-                format: 'pcm_s16le', // Request raw PCM audio data instead of MP3
-                sample_rate: 16000
+                format: 'mp3' // Fetching compact mp3 data
             },
             responseType: 'arraybuffer'
         });
 
-        // Convert the raw binary PCM data to integers so Roblox can inject it into an audio buffer
-        const buffer = Buffer.from(response.data);
-        const pcmSamples = [];
-        for (let i = 0; i < buffer.length; i += 2) {
-            pcmSamples.push(buffer.readInt16LE(i));
-        }
-
-        res.json({ success: true, samples: pcmSamples, sampleRate: 16000 });
+        // Convert raw binary buffer data to clear base64 string
+        const base64String = Buffer.from(response.data).toString('base64');
+        res.json({ success: true, audioData: base64String });
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Failed to fetch audio from Fish Audio" });
+        res.status(500).json({ error: "Failed to fetch audio from Fish Audio", details: error.message });
     }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Proxy is ready for raw data distribution!'));
+app.listen(process.env.PORT || 3000, () => console.log('Proxy is ready!'));
