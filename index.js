@@ -2,15 +2,18 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 
+app.use(express.json({ limit: '10mb' }));
+
 const FISH_AUDIO_API_KEY = "6c3315a3448c4d6ca782ccfa7a404991";
 
-// Clean streaming path structure
-app.get('/tts/:voice_id/:text.mp3', async (req, res) => {
-    const { voice_id, text } = req.params;
+app.post('/get-audio-pcm', async (req, res) => {
+    const { text, voice_id } = req.body;
+
+    if (!text || !voice_id) {
+        return res.status(400).json({ error: "Missing text or voice_id" });
+    }
 
     try {
-        const decodedText = decodeURIComponent(text);
-
         const response = await axios({
             method: 'post',
             url: 'https://api.fish.audio/v1/tts',
@@ -19,20 +22,27 @@ app.get('/tts/:voice_id/:text.mp3', async (req, res) => {
                 'Content-Type': 'application/json'
             },
             data: {
-                text: decodedText,
+                text: text,
                 voice_id: voice_id,
-                format: 'mp3'
+                format: 'pcm_s16le', // Request raw PCM audio data instead of MP3
+                sample_rate: 16000
             },
-            responseType: 'stream'
+            responseType: 'arraybuffer'
         });
 
-        res.setHeader('Content-Type', 'audio/mpeg');
-        response.data.pipe(res);
+        // Convert the raw binary PCM data to integers so Roblox can inject it into an audio buffer
+        const buffer = Buffer.from(response.data);
+        const pcmSamples = [];
+        for (let i = 0; i < buffer.length; i += 2) {
+            pcmSamples.push(buffer.readInt16LE(i));
+        }
+
+        res.json({ success: true, samples: pcmSamples, sampleRate: 16000 });
 
     } catch (error) {
         console.error(error);
-        res.status(500).send("Error generating TTS");
+        res.status(500).json({ error: "Failed to fetch audio from Fish Audio" });
     }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Proxy is active!'));
+app.listen(process.env.PORT || 3000, () => console.log('Proxy is ready for raw data distribution!'));
