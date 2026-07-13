@@ -19,24 +19,32 @@ app.post('/get-audio-bytes', async (req, res) => {
             url: 'https://api.fish.audio/v1/tts',
             headers: {
                 'Authorization': `Bearer ${FISH_AUDIO_API_KEY}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                // Using the state-of-the-art developer tier engine
+                'model': 's2.1-pro-free' 
             },
             data: {
                 text: text,
-                voice_id: voice_id,
-                format: 'pcm_s16le', // Raw 16-bit audio
+                reference_id: voice_id, // Map it to Fish Audio's exact parameter requirement
+                format: 'pcm',          // Requesting raw waveforms
                 sample_rate: 16000
             },
             responseType: 'arraybuffer'
         });
 
-        // Convert the binary audio data directly into a single compact string
+        // Pack the audio binary stream into a small network transmission string
         const base64String = Buffer.from(response.data).toString('base64');
         res.json({ success: true, audioData: base64String });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Failed to fetch audio" });
+        // Log the exact internal failure explanation to your Render Dashboard
+        if (error.response) {
+            console.error("Fish Audio Error Status:", error.response.status);
+            console.error("Fish Audio Error Body:", error.response.data.toString());
+        } else {
+            console.error("Proxy System Error:", error.message);
+        }
+        res.status(500).json({ error: "Failed to fetch audio from backend service" });
     }
 });
 
