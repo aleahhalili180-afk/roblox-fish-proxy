@@ -2,15 +2,18 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 
+app.use(express.json());
+
 const FISH_AUDIO_API_KEY = "6c3315a3448c4d6ca782ccfa7a404991";
 
-// Simple routing configuration that completely ignores parameters to prevent Roblox filtering
-app.get('/tts/:voice_id/:text', async (req, res) => {
-    const { voice_id, text } = req.params;
+app.post('/get-audio-data', async (req, res) => {
+    const { text, voice_id } = req.body;
+
+    if (!text || !voice_id) {
+        return res.status(400).json({ error: "Missing text or voice_id" });
+    }
 
     try {
-        const decodedText = decodeURIComponent(text);
-
         const response = await axios({
             method: 'post',
             url: 'https://api.fish.audio/v1/tts',
@@ -19,20 +22,21 @@ app.get('/tts/:voice_id/:text', async (req, res) => {
                 'Content-Type': 'application/json'
             },
             data: {
-                text: decodedText,
+                text: text,
                 voice_id: voice_id,
                 format: 'mp3'
             },
-            responseType: 'stream'
+            responseType: 'arraybuffer'
         });
 
-        res.setHeader('Content-Type', 'audio/mpeg');
-        response.data.pipe(res);
+        // Convert the audio stream into a safe base64 string for Roblox
+        const base64Data = Buffer.from(response.data, 'binary').toString('base64');
+        res.json({ success: true, audioData: base64Data });
 
     } catch (error) {
         console.error(error);
-        res.status(500).send("Error generating TTS");
+        res.status(500).json({ error: "Failed to fetch audio from Fish Audio" });
     }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Proxy is running!'));
+app.listen(process.env.PORT || 3000, () => console.log('Proxy is running smoothly!'));
